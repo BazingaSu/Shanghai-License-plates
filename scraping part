@@ -1,0 +1,81 @@
+### target webpage: http://www.51chepai.com.cn/paizhaojiage/
+
+import requests
+from bs4 import BeautifulSoup
+import pandas as pd
+import re
+
+### sending request and download content
+url = "http://www.51chepai.com.cn/paizhaojiage/"
+response = requests.get(url=url)
+print(response.status_code)
+print(response.encoding)
+html = response.content
+soup = BeautifulSoup(html,"html.parser",from_encoding=response.encoding)
+
+# find the actual data and store them in a dictionary
+tables = soup.find_all("tr")
+data = dict()
+
+### data from 2017 and 2008 have missing values, deal with them seperately
+
+data["2017"] = []
+for r in tables[3:13]:
+    data["2017"].append(r.text.replace("\t","").replace("\n","").split("\r"))
+    
+data["2008"] = []
+for t in tables[13*9+1:13*9+12]:
+    data["2008"].append(t.text.replace("\t","").replace("\n","").split("\r"))
+    
+#### get data from 2002 to 2007
+for i in range(10,16):
+    a = 13*i
+    b = a + 12
+    data[str(2017-i)] = []
+    for t in tables[a:b]:
+        data[str(2017-i)].append(t.text.replace("\t","").replace("\n","").split("\r"))
+#### get data from 2009 to 2016
+for i in range(1,9):
+    a = 13*i+1
+    b = a + 12
+    data[str(2017-i)] = []
+    for t in tables[a:b]:
+        data[str(2017-i)].append(t.text.replace("\t","").replace("\n","").split("\r"))
+        
+### since data from 2008 to 2017 has an extra column, dataframe has to be constructed using two parts
+
+first_part = []
+for i in range(2008,2018):
+    for a in data[str(i)]:
+        first_part.append(a)
+print(first_part)
+second_part = []
+for i in range(2002,2008):
+    for a in data[str(i)]:
+        second_part.append(a)
+print(second_part)
+
+df1 = pd.DataFrame(data=first_part,columns=["empty","Date","num_plates","lowest_deal_price","avg_deal_price","num_bidder"])
+df2 = pd.DataFrame(data=second_part,columns=["empty","Date","num_plates","lowest_deal_price","avg_deal_price","num_bidder"])
+df = pd.concat([df2,df1[:11]])
+
+#### data cleaning 
+#### jupyter notebook doesnt support Chinese characters, so they have to be eliminated first
+
+def clean_date(row):
+    row = row.replace("Äę",".").replace("ÔÂ","")
+    return row
+df["Date"] = df["Date"].apply(clean_date)
+
+def clean_lowest_price(row):
+    row = row.replace("ÔŞ","")
+    return row
+df["lowest_deal_price"] = df["lowest_deal_price"].apply(clean_lowest_price)
+df["avg_deal_price"] = df["avg_deal_price"].apply(clean_lowest_price)
+  
+  
+ ### save data to a csv file
+ df.to_csv("~/Downloads/license_plates.csv") 
+        
+
+
